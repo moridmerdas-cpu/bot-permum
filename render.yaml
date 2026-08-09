@@ -1,16 +1,38 @@
 services:
   - type: web
-    name: premium-emoji-bot
+    name: instagram-manager-bot
     env: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: python bot.py
+    pythonVersion: 3.14
+    
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "python main.py"
+    
     envVars:
-      - key: BOT_TOKEN
+      - key: TELEGRAM_TOKEN
+        scope: build,runtime
         sync: false
-      - key: WEBHOOK_URL
+      - key: ADMIN_TELEGRAM_ID
+        scope: build,runtime
         sync: false
-      - key: WEBHOOK_SECRET
+      - key: ADMIN_PASSWORD
+        scope: build,runtime
         sync: false
-      - key: PLACEHOLDER_EMOJI
-        value: "⭐"
+      - key: DATABASE_URL
+        scope: build,runtime
+        sync: false
+      - key: ENVIRONMENT
+        value: production
+      - key: PORT
+        value: 8000
+      - key: HOST
+        value: 0.0.0.0
+      - key: SESSIONS_DIR
+        value: /var/data/sessions
+      - key: TELEGRAM_WEBHOOK_URL
+        scope: build,runtime
+        sync: false
+    
+    disk:
+      name: instagram-data
+      mountPath: /var/data
+      sizeGB: 1

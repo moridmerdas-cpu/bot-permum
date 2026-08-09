@@ -1,80 +1,60 @@
-# ربات ارسال ایموجی پرمیوم به کانال تلگرام
+# Instagram Account Manager Bot
 
-این ربات پیام‌های شما را همراه با **کاستوم‌ایموجی (ایموجی پرمیوم)** به کانالتان ارسال می‌کند.
-اجرا با **Webhook** روی **Render** (سریع‌تر از polling).
+Telegram bot for managing your own Instagram account — bulk comment deletion, unlike-all, account info. Admin panel included.
 
-## ⚠️ نکتهٔ خیلی مهم قبل از شروع
+## Architecture
 
-متن دقیق مستندات رسمی تلگرام (core.telegram.org/bots/api#messageentity) دربارهٔ استفاده از
-entity نوع `custom_emoji` توسط ربات‌ها این است:
-
-> Custom emoji entities can only be used by bots that purchased additional usernames on
-> Fragment **or in the messages directly sent by the bot to private, group and supergroup
-> chats** if the owner of the bot has a Telegram Premium subscription.
-
-یعنی دو راه برای استفاده از کاستوم‌ایموجی (پرمیوم) توسط ربات وجود دارد:
-
-1. **ربات یک یوزرنیم اضافه (collectible username) از Fragment خریده باشد** — این حالت برای
-   همهٔ نوع چت‌ها (از جمله کانال) کار می‌کند، ولی هزینه‌اش قابل توجه است (چند هزار TON).
-2. **مالکِ ربات (اکانتی که ربات را با BotFather ساخته) اشتراک Telegram Premium داشته باشد** —
-   طبق متن رسمی، این حالت صریحاً فقط برای پیام‌هایی که ربات مستقیماً به **چت خصوصی، گروه یا
-   سوپرگروپ** می‌فرستد ذکر شده است.
-
-⚠️ **کانال به‌صورت صریح در حالت دوم ذکر نشده.** یعنی طبق متن رسمی مستندات، مشخص نیست که صرفاً
-پرمیوم بودن مالک ربات برای ارسال کاستوم‌ایموجی به **کانال** هم کافی باشد یا نه. در عمل ممکن است:
-- کار کند (چون تلگرام گاهی مستندات را کامل به‌روز نمی‌کند)، یا
-- entity نادیده گرفته شود و فقط ایموجی جایگزین (placeholder) دیده شود.
-
-**بهترین راه، تست عملی است:** اگر مالک ربات پرمیوم است، یک پیام تستی به کانال بفرستید و ببینید
-ایموجی واقعاً پرمیوم نمایش داده می‌شود یا نه. اگر نه، تنها راه مطمئن خرید یوزرنیم Fragment برای
-ربات است.
-
-در هر دو حالت، منطق کد همان است (ساخت `MessageEntity` از نوع `custom_emoji`)؛ چیزی که تغییر
-می‌کند فقط شرایط اکانتِ ربات/مالک آن است، نه کد.
-
-## قابلیت‌ها
-
-1. `/start` → ربات آیدی/یوزرنیم کانال را می‌پرسد.
-2. بررسی می‌کند ربات در آن کانال **ادمین** است و دسترسی ارسال پیام دارد.
-3. از شما یک پیام همراه با کد ایموجی پرمیوم می‌خواهد، به یکی از دو فرم:
-   - `سلام [6001099232784683975]`
-   - `سلام 6001099232784683975`
-   (می‌توانید چند کد در یک پیام داشته باشید.)
-4. پیام را با ایموجی پرمیوم به کانال ارسال می‌کند.
-
-کد شناسهٔ ایموجی پرمیوم (custom emoji id) را می‌توانید با فوروارد کردن یک پیام حاوی آن ایموجی
-به رباتی مثل `@GetCustomEmojiIdBot` یا با استفاده از `getForwardedFrom`/`entities` در
-API پیدا کنید.
-
-## اجرای محلی (تست)
-
-```bash
-python -m venv venv
-source venv/bin/activate      # ویندوز: venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env           # مقادیر واقعی را جایگزین کن
+```
+├── main.py                 # Entry point
+├── app/
+│   ├── bot.py              # Telegram application setup
+│   ├── instagram.py        # Instagram client wrapper (instagrapi)
+│   └── handlers.py         # User + Admin command/callback handlers
+├── config/
+│   └── settings.py         # Environment-based config
+├── utils/
+│   └── database.py         # SQLAlchemy models (User, AdminLog, BotStats)
+├── render.yaml              # Render deployment config
+├── runtime.txt              # Python 3.14 pin
+└── requirements.txt
 ```
 
-برای تست محلی بدون دامنهٔ عمومی، می‌توانید موقتاً در `bot.py` به‌جای `run_webhook`
-از `application.run_polling()` استفاده کنید.
+## Setup (Local)
 
-## دیپلوی روی Render (Webhook)
+```bash
+python3.14 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+# fill in TELEGRAM_TOKEN and ADMIN_TELEGRAM_ID
+python main.py
+```
 
-1. یک ریپازیتوری گیت‌هاب بساز و این فایل‌ها را داخلش push کن.
-2. در Render یک **New Web Service** بساز و ریپازیتوری را وصل کن (یا از `render.yaml` استفاده کن: New → Blueprint).
-3. Environment Variables را در بخش تنظیمات سرویس ست کن:
-   - `BOT_TOKEN` = توکن ربات از @BotFather
-   - `WEBHOOK_URL` = آدرس سرویس روی رندر (مثلاً `https://premium-emoji-bot.onrender.com`) — این را بعد از اولین دیپلوی (وقتی آدرس نهایی مشخص شد) ست/آپدیت کن.
-   - `WEBHOOK_SECRET` = یک رشتهٔ رندوم و مخفی دلخواه
-4. Build Command: `pip install -r requirements.txt`
-   Start Command: `python bot.py`
-5. بعد از دیپلوی موفق، ربات به‌صورت خودکار وب‌هوکش را روی
-   `https://<app-name>.onrender.com/<WEBHOOK_SECRET>` تنظیم می‌کند.
-6. ربات را در کانالت با دسترسی کامل ادمین (به‌خصوص «ارسال پیام») اضافه کن.
-7. در تلگرام به ربات `/start` بزن و مراحل را دنبال کن.
+## Deploy to Render
 
-## نکات
+1. Push this repo to GitHub.
+2. On Render: New → Blueprint → connect repo. `render.yaml` handles the rest.
+3. Set secret env vars in the Render dashboard (not committed):
+   - `TELEGRAM_TOKEN`
+   - `ADMIN_TELEGRAM_ID`
+   - `ADMIN_PASSWORD`
+   - `DATABASE_URL` (use Render Postgres for production, not SQLite — SQLite on Render's ephemeral disk won't survive redeploys without the mounted disk)
+   - `TELEGRAM_WEBHOOK_URL` — set to `https://<your-service>.onrender.com/webhook` once the service is live
+4. Disk is mounted at `/var/data` for session persistence — sessions live at `/var/data/sessions`.
 
-- پلن رایگان Render ممکن است سرویس را بعد از مدتی بی‌فعالیتی «بخوابد»؛ برای پروژهٔ جدی از پلن پولی یا یک سرویس Uptime/Cron برای پینگ دوره‌ای استفاده کن.
-- کد فقط یک ایموجی placeholder ساده (پیش‌فرض ⭐) در جای شناسهٔ عددی می‌گذارد و از `MessageEntity(type=custom_emoji, custom_emoji_id=...)` استفاده می‌کند؛ خودِ ظاهر نهایی (پرمیوم بودن واقعی) به وضعیت یوزرنیم Fragment ربات بستگی دارد (توضیح بالا).
-- state کاربر (کانال انتخابی) فقط در حافظه نگه‌داری می‌شود؛ با ری‌استارت شدن سرویس (مثلاً خوابیدن Render رایگان) پاک می‌شود و باید دوباره `/start` بزنید.
+## Admin Panel
+
+Only `ADMIN_TELEGRAM_ID` can open `/admin`. Shows:
+- Total / active user counts
+- Recent user list
+- Action logs (every delete-comments / unlike-all call is logged with timestamp)
+
+## What this does NOT do
+
+- No password storage. Login uses `instagrapi`, dumps a cookie-based session to disk, never persists the raw password.
+- No mass actions against accounts you don't control. Every action (`delete_own_comments`, `unlike_all_posts`) operates strictly on the authenticated account's own media.
+- No bypass of Instagram's 2FA or challenge flow — if Instagram throws a checkpoint, the login fails cleanly and the user is told to check the app.
+
+## Known Instagram API risk
+
+`instagrapi` reverse-engineers the private mobile API. Instagram can and does rate-limit or flag accounts that automate actions aggressively. Keep the per-run media limit (currently 100) reasonable, and don't run `unlike_all` / `delete_comments` back-to-back in tight loops — that's the fastest path to a temporary action block.
