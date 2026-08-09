@@ -1,4 +1,4 @@
-python-telegram-bot==20.7
+python-telegram-bot==22.8
 instagrapi==2.10.9
 sqlalchemy==2.0.44
 python-dotenv==1.0.0
