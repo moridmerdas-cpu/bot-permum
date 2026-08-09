@@ -22,7 +22,7 @@ class InstagramManager:
             
             if self.session_file:
                 os.makedirs(os.path.dirname(self.session_file), exist_ok=True)
-                self.client.dump_cookies(self.session_file)
+                self.client.dump_settings(self.session_file)
             
             return True, "✅ ورود موفق"
         except BadPassword:
@@ -39,7 +39,8 @@ class InstagramManager:
             if not os.path.exists(session_file):
                 return False
             self.client = Client()
-            self.client.load_cookies(session_file)
+            self.client.load_settings(session_file)
+            self.client.get_timeline_feed()  # validates the restored session is still active
             self.user_id = self.client.user_id
             self.session_file = session_file
             return True
