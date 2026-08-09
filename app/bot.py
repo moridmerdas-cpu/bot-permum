@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -52,10 +53,26 @@ class InstagramManagerBot:
         
         logger.info("🚀 Bot initialized successfully")
         
-        if self.settings.ENVIRONMENT == "production" and self.settings.TELEGRAM_WEBHOOK_URL:
-            await self.setup_webhook()
-        else:
-            await self.app.run_polling()
+        # NOTE: run_polling() manages its own event loop internally and cannot
+        # be awaited from inside an already-running loop (main.py wraps this
+        # whole call in asyncio.run(main())). We drive the same lifecycle
+        # manually instead: initialize -> start -> start_polling -> wait -> stop.
+        await self.app.initialize()
+        await self.app.start()
+        
+        try:
+            if self.settings.ENVIRONMENT == "production" and self.settings.TELEGRAM_WEBHOOK_URL:
+                await self.setup_webhook()
+            else:
+                await self.app.updater.start_polling(drop_pending_updates=True)
+            
+            logger.info("🤖 Bot is running. Press Ctrl+C to stop.")
+            await asyncio.Event().wait()  # run forever until cancelled
+        finally:
+            if self.app.updater and self.app.updater.running:
+                await self.app.updater.stop()
+            await self.app.stop()
+            await self.app.shutdown()
     
     async def setup_webhook(self):
         """Setup webhook for production"""
